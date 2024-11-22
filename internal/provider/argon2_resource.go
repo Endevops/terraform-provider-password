@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/go-crypt/crypt/algorithm"
+	"github.com/go-crypt/crypt/algorithm/argon2"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -43,6 +46,7 @@ type Argon2ResourceModel struct {
 	Thread     types.Int32  `tfsdk:"thread"`
 	Memory     types.Int32  `tfsdk:"memory"`
 	Iterations types.Int32  `tfsdk:"iterations"`
+	Hash       types.String `tfsdk:"hash"`
 	Id         types.String `tfsdk:"id"`
 }
 
@@ -59,11 +63,13 @@ func (r *Argon2Resource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "The password to hash",
 				Required:            true,
 				Computed:            false,
+				Sensitive:           true,
 			},
 			"salt": schema.StringAttribute{
 				MarkdownDescription: "The salt to use for hashing",
 				Required:            true,
 				Computed:            false,
+				Sensitive:           true,
 			},
 			"key_len": schema.Int32Attribute{
 				MarkdownDescription: "The length of the key to generate",
@@ -89,6 +95,11 @@ func (r *Argon2Resource) Schema(ctx context.Context, req resource.SchemaRequest,
 				MarkdownDescription: "Controls the number of iterations",
 				Default:             int32default.StaticInt32(3),
 				Computed:            true,
+			},
+			"hash": schema.StringAttribute{
+				MarkdownDescription: "The generated hash",
+				Computed:            true,
+				Sensitive:           true,
 			},
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -131,17 +142,15 @@ func (r *Argon2Resource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create Argon2, got error: %s", err))
-	//     return
-	// }
-
 	// For the purposes of this Argon2 code, hardcoding a response value to
 	// save into the Terraform state.
 	data.Id = types.StringValue("argon2-id")
+
+	digest := generatePassword(resp.Diagnostics, data)
+	if digest == nil {
+		return
+	}
+	data.Hash = types.StringValue(digest.String())
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -149,6 +158,25 @@ func (r *Argon2Resource) Create(ctx context.Context, req resource.CreateRequest,
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func generatePassword(diag diag.Diagnostics, data Argon2ResourceModel) algorithm.Digest {
+	var (
+		hasher *argon2.Hasher
+		err    error
+		digest algorithm.Digest
+	)
+
+	if hasher, err = argon2.New(argon2.WithProfileRFC9106Recommended()); err != nil {
+		diag.AddError("Argon 2 error", fmt.Sprintf("Unable to create Argon2, got error: %s", err))
+		return nil
+	}
+
+	if digest, err = hasher.Hash(data.Password.ValueString()); err != nil {
+		diag.AddError("Argon 2 error", fmt.Sprintf("Unable to hash Argon2, got error: %s", err))
+		return nil
+	}
+	return digest
 }
 
 func (r *Argon2Resource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -174,7 +202,10 @@ func (r *Argon2Resource) Read(ctx context.Context, req resource.ReadRequest, res
 }
 
 func (r *Argon2Resource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data Argon2ResourceModel
+	var (
+		data    Argon2ResourceModel
+		oldData Argon2ResourceModel
+	)
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -182,14 +213,17 @@ func (r *Argon2Resource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	resp.Diagnostics.Append(req.State.Get(ctx, &oldData)...)
 
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update Argon2, got error: %s", err))
-	//     return
-	// }
+	if oldData.Password.Equal(data.Password) {
+		data.Hash = oldData.Hash
+	} else {
+		digest := generatePassword(resp.Diagnostics, data)
+		if digest == nil {
+			return
+		}
+		data.Hash = types.StringValue(digest.String())
+	}
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -204,14 +238,6 @@ func (r *Argon2Resource) Delete(ctx context.Context, req resource.DeleteRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
-	// If applicable, this is a great opportunity to initialize any necessary
-	// provider client data and make a call using it.
-	// httpResp, err := r.client.Do(httpReq)
-	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete Argon2, got error: %s", err))
-	//     return
-	// }
 }
 
 func (r *Argon2Resource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

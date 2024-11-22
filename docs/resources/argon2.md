@@ -17,11 +17,12 @@ Argon2 resource
 
 ### Required
 
-- `password` (String) The password to hash
-- `salt` (String) The salt to use for hashing
+- `password` (String, Sensitive) The password to hash
+- `salt` (String, Sensitive) The salt to use for hashing
 
 ### Read-Only
 
+- `hash` (String, Sensitive) The generated hash
 - `id` (String) Argon2 identifier
 - `iterations` (Number) Controls the number of iterations
 - `key_len` (Number) The length of the key to generate
