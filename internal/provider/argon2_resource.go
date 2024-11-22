@@ -6,7 +6,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"runtime"
 
 	"github.com/go-crypt/crypt/algorithm"
@@ -33,16 +32,12 @@ func NewArgon2Resource() resource.Resource {
 }
 
 // Argon2Resource defines the resource implementation.
-type Argon2Resource struct {
-	client *http.Client
-}
+type Argon2Resource struct{}
 
 // Argon2ResourceModel describes the resource data model.
 type Argon2ResourceModel struct {
-	Salt       types.String `tfsdk:"salt"`
 	Password   types.String `tfsdk:"password"`
 	KeyLen     types.Int32  `tfsdk:"key_len"`
-	Time       types.Int32  `tfsdk:"time"`
 	Thread     types.Int32  `tfsdk:"thread"`
 	Memory     types.Int32  `tfsdk:"memory"`
 	Iterations types.Int32  `tfsdk:"iterations"`
@@ -57,7 +52,7 @@ func (r *Argon2Resource) Metadata(ctx context.Context, req resource.MetadataRequ
 func (r *Argon2Resource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Argon2 resource",
+		MarkdownDescription: "Argon2 is a password-hashing function that summarizes the state of the art in the design of memory-hard functions and can be used to hash passwords for credential storage.",
 		Attributes: map[string]schema.Attribute{
 			"password": schema.StringAttribute{
 				MarkdownDescription: "The password to hash",
@@ -65,36 +60,29 @@ func (r *Argon2Resource) Schema(ctx context.Context, req resource.SchemaRequest,
 				Computed:            false,
 				Sensitive:           true,
 			},
-			"salt": schema.StringAttribute{
-				MarkdownDescription: "The salt to use for hashing",
-				Required:            true,
-				Computed:            false,
-				Sensitive:           true,
-			},
 			"key_len": schema.Int32Attribute{
 				MarkdownDescription: "The length of the key to generate",
-				Default:             int32default.StaticInt32(32),
-				Computed:            true,
-			},
-			"time": schema.Int32Attribute{
-				MarkdownDescription: "The number of iterations to use",
-				Default:             int32default.StaticInt32(1),
+				Default:             int32default.StaticInt32(argon2.KeyLengthDefault),
+				Optional:            true,
 				Computed:            true,
 			},
 			"thread": schema.Int32Attribute{
 				MarkdownDescription: "The number of threads to use",
 				Default:             int32default.StaticInt32(int32(runtime.NumCPU())),
+				Optional:            true,
 				Computed:            true,
 			},
 			"memory": schema.Int32Attribute{
-				MarkdownDescription: "The amount of memory to use for hashing",
-				Default:             int32default.StaticInt32(65536),
+				MarkdownDescription: "The amount of memory to use for hashing (in KiB)",
+				Default:             int32default.StaticInt32(argon2.MemoryDefault),
+				Optional:            true,
 				Computed:            true,
 			},
 			"iterations": schema.Int32Attribute{
 				MarkdownDescription: "Controls the number of iterations",
-				Default:             int32default.StaticInt32(3),
+				Default:             int32default.StaticInt32(argon2.IterationsDefault),
 				Computed:            true,
+				Optional:            true,
 			},
 			"hash": schema.StringAttribute{
 				MarkdownDescription: "The generated hash",
@@ -117,19 +105,6 @@ func (r *Argon2Resource) Configure(ctx context.Context, req resource.ConfigureRe
 	if req.ProviderData == nil {
 		return
 	}
-
-	client, ok := req.ProviderData.(*http.Client)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	r.client = client
 }
 
 func (r *Argon2Resource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -167,9 +142,15 @@ func generatePassword(diag diag.Diagnostics, data Argon2ResourceModel) algorithm
 		digest algorithm.Digest
 	)
 
-	if hasher, err = argon2.New(argon2.WithProfileRFC9106Recommended()); err != nil {
-		diag.AddError("Argon 2 error", fmt.Sprintf("Unable to create Argon2, got error: %s", err))
-		return nil
+	hasher = argon2.ProfileRFC9106Recommended.Hasher()
+	if err = hasher.WithOptions(
+		argon2.WithIterations(int(data.Iterations.ValueInt32())),
+		argon2.WithKeyLength(int(data.KeyLen.ValueInt32())),
+		argon2.WithMemoryInKiB(uint32(data.Memory.ValueInt32())),
+		argon2.WithVariant(argon2.VariantID),
+		argon2.WithParallelism(int(data.Thread.ValueInt32())),
+	); err != nil {
+		diag.AddError("Argon 2 initialization error", fmt.Sprintf("Unable to generate hash, got error %s", err))
 	}
 
 	if digest, err = hasher.Hash(data.Password.ValueString()); err != nil {

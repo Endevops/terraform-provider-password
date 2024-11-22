@@ -18,10 +18,9 @@ func TestAccArgon2ResourceCreate(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccArgon2ResourceConfig("example-password", "example-salt"),
+				Config: testAccArgon2ResourceConfig("example-password"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("password_argon2.test", "password", "example-password"),
-					resource.TestCheckResourceAttr("password_argon2.test", "salt", "example-salt"),
 					resource.TestCheckResourceAttr("password_argon2.test", "id", "argon2-id"),
 					resource.TestCheckResourceAttrSet("password_argon2.test", "hash"),
 					resource.TestCheckResourceAttrWith("password_argon2.test", "hash", validatePassword("example-password")),
@@ -53,10 +52,9 @@ func TestAccArgon2ResourceHashShouldNotChangeWhenPasswordIsTheSame(t *testing.T)
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccArgon2ResourceConfig("example-password", "example-salt"),
+				Config: testAccArgon2ResourceConfig("example-password"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("password_argon2.test", "password", "example-password"),
-					resource.TestCheckResourceAttr("password_argon2.test", "salt", "example-salt"),
 					resource.TestCheckResourceAttr("password_argon2.test", "id", "argon2-id"),
 					resource.TestCheckResourceAttrSet("password_argon2.test", "hash"),
 					resource.TestCheckResourceAttrWith("password_argon2.test", "hash", validatePassword("example-password")),
@@ -64,10 +62,9 @@ func TestAccArgon2ResourceHashShouldNotChangeWhenPasswordIsTheSame(t *testing.T)
 			},
 			// Update and Read testing
 			{
-				Config: testAccArgon2ResourceConfig("example-password", "new-salt"),
+				Config: testAccArgon2ResourceConfig("example-password"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("password_argon2.test", "password", "example-password"),
-					resource.TestCheckResourceAttr("password_argon2.test", "salt", "new-salt"),
 					resource.TestCheckResourceAttr("password_argon2.test", "id", "argon2-id"),
 					resource.TestCheckResourceAttrSet("password_argon2.test", "hash"),
 					resource.TestCheckResourceAttrWith("password_argon2.test", "hash", validatePassword("example-password")),
@@ -85,10 +82,9 @@ func TestAccArgon2ResourceCreateAndUpdate(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccArgon2ResourceConfig("example-password", "example-salt"),
+				Config: testAccArgon2ResourceConfig("example-password"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("password_argon2.test", "password", "example-password"),
-					resource.TestCheckResourceAttr("password_argon2.test", "salt", "example-salt"),
 					resource.TestCheckResourceAttr("password_argon2.test", "id", "argon2-id"),
 					resource.TestCheckResourceAttrSet("password_argon2.test", "hash"),
 					resource.TestCheckResourceAttrWith("password_argon2.test", "hash", validatePassword("example-password")),
@@ -107,10 +103,9 @@ func TestAccArgon2ResourceCreateAndUpdate(t *testing.T) {
 			// },
 			// Update and Read testing
 			{
-				Config: testAccArgon2ResourceConfig("new-password", "new-salt"),
+				Config: testAccArgon2ResourceConfig("new-password"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("password_argon2.test", "password", "new-password"),
-					resource.TestCheckResourceAttr("password_argon2.test", "salt", "new-salt"),
 					resource.TestCheckResourceAttr("password_argon2.test", "id", "argon2-id"),
 					resource.TestCheckResourceAttrSet("password_argon2.test", "hash"),
 					resource.TestCheckResourceAttrWith("password_argon2.test", "hash", validatePassword("new-password")),
@@ -121,11 +116,10 @@ func TestAccArgon2ResourceCreateAndUpdate(t *testing.T) {
 	})
 }
 
-func testAccArgon2ResourceConfig(password string, salt string) string {
+func testAccArgon2ResourceConfig(password string) string {
 	return fmt.Sprintf(`
 resource "password_argon2" "test" {
   password = %[1]q
-  salt = %[2]q
 }
-`, password, salt)
+`, password)
 }

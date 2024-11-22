@@ -3,12 +3,12 @@
 page_title: "password_argon2 Resource - password"
 subcategory: ""
 description: |-
-  Argon2 resource
+  Argon2 is a password-hashing function that summarizes the state of the art in the design of memory-hard functions and can be used to hash passwords for credential storage.
 ---
 
 # password_argon2 (Resource)
 
-Argon2 resource
+Argon2 is a password-hashing function that summarizes the state of the art in the design of memory-hard functions and can be used to hash passwords for credential storage.
 
 
 
@@ -18,14 +18,15 @@ Argon2 resource
 ### Required
 
 - `password` (String, Sensitive) The password to hash
-- `salt` (String, Sensitive) The salt to use for hashing
+
+### Optional
+
+- `iterations` (Number) Controls the number of iterations
+- `key_len` (Number) The length of the key to generate
+- `memory` (Number) The amount of memory to use for hashing (in KiB)
+- `thread` (Number) The number of threads to use
 
 ### Read-Only
 
 - `hash` (String, Sensitive) The generated hash
 - `id` (String) Argon2 identifier
-- `iterations` (Number) Controls the number of iterations
-- `key_len` (Number) The length of the key to generate
-- `memory` (Number) The amount of memory to use for hashing
-- `thread` (Number) The number of threads to use
-- `time` (Number) The number of iterations to use
