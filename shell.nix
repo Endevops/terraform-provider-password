@@ -20,6 +20,6 @@ in
       goEnv
       gomod2nix
       pkgs.golangci-lint
-      # pkgs.terraform
+      pkgs.terraform
     ];
   }
